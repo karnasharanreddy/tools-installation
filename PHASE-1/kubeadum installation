@@ -1,0 +1,105 @@
+# Installing Kubernetes v1.30 with Kubeadm, Calico, and containerd
+
+This guide provides step-by-step instructions to install a Kubernetes cluster using **Kubeadm**, **Calico** as the CNI, and **containerd** as the container runtime.
+
+---
+
+## 🛠 Prerequisites
+Ensure you have:
+- **Ubuntu 22.04** (or another compatible Linux distribution)
+- **2+ CPU cores**, **2GB+ RAM**, and **20GB+ storage** per node
+- **Root or sudo access**
+- **Firewall & SELinux disabled**
+
+---
+
+## 🔧 Step 1: Disable Swap & Update System
+```bash
+sudo swapoff -a
+sed -i '/swap/d' /etc/fstab
+sudo apt update && sudo apt upgrade -y
+```
+
+---
+
+## 🔧 Step 2: Install Required Packages
+```bash
+sudo apt install -y apt-transport-https ca-certificates curl gnupg2 software-properties-common
+```
+
+---
+
+## 🔧 Step 3: Install containerd
+```bash
+sudo apt install -y containerd
+sudo mkdir -p /etc/containerd
+containerd config default | sudo tee /etc/containerd/config.toml
+sudo systemctl restart containerd
+sudo systemctl enable containerd
+```
+
+---
+
+## 🔧 Step 4: Install Kubernetes Components
+```bash
+curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.30/deb/Release.key | sudo tee /etc/apt/keyrings/kubernetes-apt-keyring.asc
+
+echo "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.asc] https://pkgs.k8s.io/core:/stable:/v1.30/deb/ /" | sudo tee /etc/apt/sources.list.d/kubernetes.list
+
+sudo apt update
+sudo apt install -y kubelet kubeadm kubectl
+sudo systemctl enable kubelet
+```
+
+---
+
+## 🔧 Step 5: Initialize the Cluster (Control Plane Node Only)
+```bash
+sudo kubeadm init --pod-network-cidr=192.168.0.0/16 --cri-socket /run/containerd/containerd.sock
+```
+
+After completion, set up `kubectl` for the current user:
+```bash
+mkdir -p $HOME/.kube
+sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+sudo chown $(id -u):$(id -g) $HOME/.kube/config
+```
+
+---
+
+## 🔧 Step 6: Install Calico CNI
+```bash
+kubectl create -f https://raw.githubusercontent.com/projectcalico/calico/v3.26.1/manifests/calico.yaml
+```
+
+Verify the installation:
+```bash
+kubectl get pods -n kube-system
+```
+
+---
+
+## 🔧 Step 7: Join Worker Nodes (Run on Worker Nodes Only)
+On each worker node, run the **join command** provided by `kubeadm init`. If you missed it, retrieve it from the control plane:
+```bash
+kubeadm token create --print-join-command
+```
+Then, run the output command on your worker nodes.
+
+---
+
+## 🎉 Step 8: Verify Cluster
+Check if all nodes are **Ready**:
+```bash
+kubectl get nodes
+```
+Ensure all pods are **Running**:
+```bash
+kubectl get pods -n kube-system
+```
+
+---
+
+## 🚀 Conclusion
+Your Kubernetes cluster is now fully installed with **Kubeadm, Calico, and containerd**! 🎉
+
